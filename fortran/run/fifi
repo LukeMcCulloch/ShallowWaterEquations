@@ -1,0 +1,13 @@
+1D_Unsteady_Conduction_Model
+    10.   -5.
+    64001    64000    600
+    1.0   0.05
+    1.
+
+End of file
+!! File contents:
+!!
+!! 1D_domain_length, starting_position
+!! npts, ncells, nt
+!! HL, HR/HL
+!! C
