@@ -80,7 +80,6 @@ CONTAINS
 
      ! Write the fifi data -----------------------------------------------
      OPEN(20,file=outputfile)
-     !Write(20,*) '   Luke McCulloch, ENME 6728 Project 1, Outputfile '
      !write(20,*)
      !write(20,*) '---------------------------------------------------------'
      !write(20,*) title

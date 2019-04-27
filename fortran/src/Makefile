@@ -77,7 +77,7 @@ $(OBJECTS) : %.o : %.f90
 
 
 clean:
-	$(RM) .o *.mod 
+	$(RM) *.o *.mod 
 
 realclean:
 	$(RM) *.o  *.mod $(RUN_DIR)/$(PROGRAM)
