@@ -20,7 +20,8 @@ PROGRAM solver
   IMPLICIT NONE  
 
   integer, parameter :: WP=defaultp
-  real, parameter :: e=2.718281828459045
+  real(wp), parameter :: e=2.718281828459045
+  real(wp), parameter :: atol = 0.00000000000000001    ! a new tolerance
   INTEGER, DIMENSION(3), PARAMETER :: it1 = (/ 40, 80, 120 /)   ! output times
 
   INTEGER :: narg    ! # of command line arguments
@@ -347,7 +348,7 @@ PROGRAM solver
   write(*,*)'eigen1 max = ',store1n,'eigen2 max=',store1p
 
   do i=1,npts
-     if (abs((lamda(1,i)-store1n)) < .00000000000000001) then
+     if (abs((lamda(1,i)-store1n)) < atol) then
         !write(*,*) lamda(1,i), store1n, ((lamda(1,i)-store1n))
         waveloc = pts(1,i)
         waveI=i
