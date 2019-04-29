@@ -44,17 +44,17 @@ Contains
 
     End Do
 
-    do i=1,ncells
-       write(*,*)'i=',i,' H = ',H(1,i,1)
-    end do
-    print*
-    do i=1,ncells
-       write(*,*)'i=',i,' uH = ',uH(1,i,1)
-    end do
-    print*
-    do i=1,ncells
-       write(*,*)'i=',i,' u = ',u(1,i,1)
-    end do
+   !  do i=1,ncells
+   !     write(*,*)'i=',i,' H = ',H(1,i,1)
+   !  end do
+   !  print*
+   !  do i=1,ncells
+   !     write(*,*)'i=',i,' uH = ',uH(1,i,1)
+   !  end do
+   !  print*
+   !  do i=1,ncells
+   !     write(*,*)'i=',i,' u = ',u(1,i,1)
+   !  end do
     print*
    
 
