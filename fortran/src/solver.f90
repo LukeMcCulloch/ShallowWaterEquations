@@ -121,6 +121,8 @@ PROGRAM solver
   real(wp) :: start
   real(wp) :: finish
 
+  real(wp) :: se1   ! roe speed e1  
+  real(wp) :: se2   ! roe speed e2
 
 
 
@@ -201,8 +203,8 @@ PROGRAM solver
      !write(*,*) 'dt=',dt
   end if
 
-  write(*,*) 'Please input your choice of output time as a real number, in seconds :>'
-  read(*,*)  tout
+  !write(*,*) 'Please input your choice of output time as a real number, in seconds :>'
+  !read(*,*)  tout
   nt=1!int(tout/dt)+1
   write(*,*)'nt*dt=',nt*dt,'nt=', nt
   
@@ -260,6 +262,10 @@ PROGRAM solver
 
         lamda(1,i) = u_hat(1,i)-sqrt(g*H_hat(1,i))
         lamda(2,i) = u_hat(1,i)+sqrt(g*H_hat(1,i))
+        
+        !se1 = u(1,i,n+1) - sqrt(g*H(1,i,n))
+        !se2 = u(1,i,n+1) + sqrt(g*H(1,i,n))
+
 
 
         dummy1 = 1.0/( lamda(2,i) - lamda(1,i) )
@@ -267,7 +273,8 @@ PROGRAM solver
         dummy3 = uH(1,i+1,n) - uH(1,i,n)
         dummy4 = u(1,i,n)*uH(1,i,n) + g*((H(1,i,n))**2)/2.
 
-        alpha(1,i) = dummy1* ( lamda(2,i)*dummy2 - dummy3 )
+        !! wave propagation velocities ?
+        alpha(1,i) = dummy1* (  lamda(2,i)*dummy2 - dummy3 )
         alpha(2,i) = dummy1* ( -lamda(1,i)*dummy2 + dummy3 )
 
         !! Define the flux at each interface
@@ -287,6 +294,7 @@ PROGRAM solver
         H(1,i,n+1)  = H(1,i,n) + (dt/dx)*(F(1,i-1)-F(1,i))
         uH(1,i,n+1) = uH(1,i,n) + (dt/dx)*(F(2,i-1)-F(2,i))
         u(1,i,n+1)  = uH(1,i,n+1)/H(1,i,n+1)
+
 
         !write(*,*)'i= ',i,' H= ',H(1,i,n),'uH=',uH(1,i,n),' u= ',u(1,i,n)
      end do !End conservation update
