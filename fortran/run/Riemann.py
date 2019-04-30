@@ -11,10 +11,10 @@ def f(g,HL,Hm,HR):
     print 'inside the f function,'
     print 'Hm = {}, HR = {}'.format(Hm, HR)
     print 'fraction thing = {}'.format((1./Hm)-(1./HR))
-    return 2.*(np.sqrt(g*HL) - np.sqrt(g*Hm))-(Hm-HR)*np.sqrt((g/2.)*((1./Hm)+(1./HR)))
+    return 2.*(np.sqrt(g*HL) - np.sqrt(g*Hm)) - (Hm-HR) * np.sqrt((g/2.)*((1./Hm)+(1./HR)))
 
 
-def df(g,HL,Hm,HR):
+def df_old(g,HL,Hm,HR):
     dum1 = (2.*(np.sqrt(g*HL) - np.sqrt(g*Hm))**-1)*(-((g*Hm)**(-.5)))
     dum2 = np.sqrt((g/2.)*((1./Hm)+(1./HR)))
     dum3 = -(Hm-HR)/2.
@@ -22,6 +22,13 @@ def df(g,HL,Hm,HR):
     dum5 = ((-g/2.)*(1./(Hm**2.)))
     
     return dum1+dum2+dum3*dum4*dum5
+
+def df(g,HL,Hm,HR,dx=.00000100001):
+    """
+    df/dHm
+    """
+    d1 = (f(g,HL,Hm+dx,HR) - f(g,HL,Hm,HR) ) / dx
+    return d1
     
 HL      = 1.0
 HRoHL   = 0.5

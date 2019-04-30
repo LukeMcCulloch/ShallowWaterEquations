@@ -263,7 +263,7 @@ print 'Numeric - Analytic = {}'.format(nws[0]-Levt/t)
 print ''
 print 'The Left solution begins to slow down at {}, face {}'.format(nws[1],nws[2])
 print ''
-print 'Analytic H({},~1.0)={}, Numeric H({},~1.0)={}'.format(nws[2],H[nws[2],n],nws[2],solvH[nws[2]])
+#print 'Analytic H({},~1.0)={}, Numeric H({},~1.0)={}'.format(nws[2],H[nws[2],n],nws[2],solvH[nws[2]])
 
 
 """

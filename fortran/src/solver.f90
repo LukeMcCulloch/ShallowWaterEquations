@@ -203,8 +203,9 @@ PROGRAM solver
      !write(*,*) 'dt=',dt
   end if
 
-  write(*,*) 'Please input your choice of output time as a real number, in seconds :>'
-  read(*,*)  tout
+  !write(*,*) 'Please input your choice of output time as a real number, in seconds :>'
+  !read(*,*)  tout
+  tout = 1.
   nt=1!int(tout/dt)+1
   write(*,*)'nt*dt=',nt*dt,'nt=', nt
   
@@ -260,6 +261,7 @@ PROGRAM solver
         u_hat(1,i)=( u(1,i+1,n)*sqrt(H(1,i+1,n)) + u(1,i,n)*sqrt(H(1,i,n)) )/&
              (sqrt(H(1,i+1,n))+sqrt(H(1,i,n)))
 
+        !! eigen vectors
         lamda(1,i) = u_hat(1,i)-sqrt(g*H_hat(1,i))
         lamda(2,i) = u_hat(1,i)+sqrt(g*H_hat(1,i))
         
@@ -278,16 +280,12 @@ PROGRAM solver
         alpha(2,i) = dummy1* ( -lamda(1,i)*dummy2 + dummy3 )
 
 
+
         !! Define the flux at each interface
         F(1,i) = uH(1,i,n) + min(lamda(1,i),0.)*alpha(1,i) + min(lamda(2,i),0.)*alpha(2,i)
         F(2,i) = dummy4 + min(lamda(1,i),0.)*alpha(1,i)*lamda(1,i) + min(lamda(2,i),0.)*alpha(2,i)*lamda(2,i)
 
 
-      !   if ( alpha(1,i) < 0.0  .and.  0.0 < alpha(2,i)  ) then
-      !      se1 = ( F(1,i) + F(2,i) )*0.5
-      !      !F(1,i) = se1
-      !      !F(2,i) = se1
-      !   endif
 
         dummy6 = max( abs(lamda(1,i)) , abs(lamda(2,i)) )
         dummy5 = max(dummy5,dummy6)
