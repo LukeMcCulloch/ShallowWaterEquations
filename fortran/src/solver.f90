@@ -35,6 +35,8 @@ PROGRAM solver
   INTEGER :: t_1sec  ! index at approx 1 sec
   INTEGER :: waveI   ! index location of the max Left Eigenvalue
 
+  INTEGER :: m,mw    ! entropy dummies
+
   ! Efficient Placement of these declarations...?
   CHARACTER(len=24) :: inputfile
   CHARACTER(len=24) :: outputfile
@@ -69,6 +71,7 @@ PROGRAM solver
   REAL(WP), ALLOCATABLE, DIMENSION(:)     :: bm           ! main  - diagonal
   REAL(WP), ALLOCATABLE, DIMENSION(:)     :: cm           ! super - diagonal
   REAL(WP), ALLOCATABLE, DIMENSION(:)     :: dm           ! implicit RHS
+
 
   
   real(wp) :: g        ! gravitational acceleration
@@ -192,7 +195,7 @@ PROGRAM solver
      !write(*,*) 'Explicit scheme, dt max =', dt_max
      !write(*,*) 'Choose a time step less than this'
      !write(*,*) 'Please input your choice of time step size as a real number :>'
-     write(*,*) 'Using Cournot Number of 0.9:'
+     !write(*,*) 'Using Cournot Number of 0.9:'
      OPEN(10,file='ev.dat')
      read(10,'(AAAAA)') title2
      read(10,*) ev_max
@@ -256,17 +259,23 @@ PROGRAM solver
      !! #Cell face "pts" loop to update Roe avg vbls at the faces
      dummy5=1.
      do i=1,npts
+        ! hbar, LaVeque 15.32 
         H_hat(1,i)=(H(1,i+1,n)+H(1,i,n))/2.
         
+        ! Roe Average Velocity, LaVeque 15.35
         u_hat(1,i)=( u(1,i+1,n)*sqrt(H(1,i+1,n)) + u(1,i,n)*sqrt(H(1,i,n)) )/&
              (sqrt(H(1,i+1,n))+sqrt(H(1,i,n)))
 
-        !! eigen vectors
+        !! eigen values, LaVeque 15.36
         lamda(1,i) = u_hat(1,i)-sqrt(g*H_hat(1,i))
         lamda(2,i) = u_hat(1,i)+sqrt(g*H_hat(1,i))
         
-        !se1 = u(1,i,n+1) - sqrt(g*H(1,i,n))
-        !se2 = u(1,i,n+1) + sqrt(g*H(1,i,n))
+
+        ! ubar = (sqrt(u_l) + sqrt(u_r)) / (sqrt(h_l) + sqrt(h_r))
+        ! cbar = sqrt( 0.5 * g * (h_l + h_r))
+        !
+        ! ubar = u_hat
+        ! cbar = sqrt(g*H_hat(1,i))
 
 
 
@@ -275,9 +284,10 @@ PROGRAM solver
         dummy3 = uH(1,i+1,n) - uH(1,i,n)
         dummy4 = u(1,i,n)*uH(1,i,n) + g*((H(1,i,n))**2)/2.
 
-        !! wave propagation velocities ?
+        !! alpha coefficients, LaVeque 15.39?
         alpha(1,i) = dummy1* (  lamda(2,i)*dummy2 - dummy3 )
         alpha(2,i) = dummy1* ( -lamda(1,i)*dummy2 + dummy3 )
+
 
 
 
@@ -285,12 +295,7 @@ PROGRAM solver
         F(1,i) = uH(1,i,n) + min(lamda(1,i),0.)*alpha(1,i) + min(lamda(2,i),0.)*alpha(2,i)
         F(2,i) = dummy4 + min(lamda(1,i),0.)*alpha(1,i)*lamda(1,i) + min(lamda(2,i),0.)*alpha(2,i)*lamda(2,i)
 
-
-
-        dummy6 = max( abs(lamda(1,i)) , abs(lamda(2,i)) )
-        dummy5 = max(dummy5,dummy6)
-        !write(*,*)'lamda1= ',lamda(1,i),'lamda2= ',lamda(2,i),'','Flux1=',F(1,i),'Flux2=',F(2,i)
-        !write(*,*)'alpha1= ',alpha(1,i),'alpha2= ',alpha(2,i)
+      !! todo: fix the entropy for transonic rarefaction
 
      end do !End Riemann flux update
      !pause
