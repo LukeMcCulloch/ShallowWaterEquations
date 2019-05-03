@@ -37,7 +37,7 @@ PROGRAM solver
   INTEGER :: t_1sec  ! index at approx 1 sec
   INTEGER :: waveI   ! index location of the max Left Eigenvalue
 
-  INTEGER :: m,mw    ! entropy dummies
+  INTEGER :: m,mw,mx ! entropy dummies
 
   ! Efficient Placement of these declarations...?
   CHARACTER(len=24) :: inputfile
@@ -68,6 +68,8 @@ PROGRAM solver
   REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: H_exact      ! 1 x ncells array cell 
 
   REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: s            ! entropy fix
+  REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: amdq         ! left-going flux-differences
+  REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: apdq         ! right-going flux-differences
 
 
 
@@ -78,7 +80,7 @@ PROGRAM solver
   REAL(WP), ALLOCATABLE, DIMENSION(:)     :: cm           ! super - diagonal
   REAL(WP), ALLOCATABLE, DIMENSION(:)     :: dm           ! implicit RHS
 
-  REAL(WP), DIMENSION(2)                  :: lambda_m     ! entropy fix
+  !REAL(WP), DIMENSION(2)                  :: lambda_m     ! entropy fix
 
   
   real(wp) :: g        ! gravitational acceleration
@@ -86,6 +88,7 @@ PROGRAM solver
   real(wp) :: xo       ! starting position
   real(wp) :: dx       ! cell width
   real(wp) :: dt       ! timestep
+  real(wp) :: dtdx     ! dt/dx
   real(wp) :: dt_max   ! timestep max
   real(wp) :: HL       ! thermal conductivity cnst
   real(wp) :: HRoHL    ! part of Robin's B.C
@@ -136,6 +139,17 @@ PROGRAM solver
 
   !entropy fix
   real(wp) :: s0 ! entropy
+  real(wp) :: s1 ! entropy
+  real(wp) :: s2 ! entropy
+  real(wp) :: s3 ! entropy
+
+  real(wp) :: hr1 ! entropy
+  real(wp) :: uhr1 ! entropy
+  real(wp) :: hl2 ! entropy
+  real(wp) :: uhl2 ! entropy
+  real(wp) :: sfract ! entropy
+
+  real(wp) :: df ! entropy
 
 
 
@@ -230,6 +244,8 @@ PROGRAM solver
   allocate( qR(num_eqn,ncells))
   allocate( wave(num_eqn, num_waves, ncells ) )
   allocate( s(num_waves, ncells ) )
+  allocate( amdq(num_eqn, ncells ) )
+  allocate( apdq(num_eqn, ncells ) )
 
 !!$
 !!$  If (implicit .eqv. .true.) then
@@ -241,6 +257,7 @@ PROGRAM solver
 
   write(*,*) ''
   call InitialConditions1D(npts, ncells, pts, cells,  HL, HRoHL, H, u, uH, Q, qL, qR)
+  !call InitialConditions1D(npts, ncells, pts, cells,  HL, HRoHL, H, u, uH, Q, qL, qR)
   !write(*,*) '  Initial H:'
   !do i=1,ncells
   !   write(*,*)'cell loc=',cells(1,i),'initial H=', H(1,i,1),'initial U = ',u(1,i,1),'initial uH=',uH(1,i,1)
@@ -310,7 +327,7 @@ PROGRAM solver
 
 
 
-        ! Finally, compute the waves.
+        ! Finally, compute the waves:
         wave(1,1,i) = alpha(1,i)
         wave(2,1,i) = alpha(1,i)*(u_hat(1,i) - cbar)
         s(1,i) = u_hat(1,i) - cbar
@@ -323,24 +340,112 @@ PROGRAM solver
 
 
 
-     end do !End Riemann flux update
+     end do !End Riemann flux update, non entropy
      !------------------------------------------------------
-     !! entropy fix for transonic rarefaction
-      ! do i=1,npts
-      !    ! L wave
-      !    s0 = qr(2,i-1)/qr(1,i-1) - dsqrt(g*qr(1,i-1))  !uh/u - sqrt(hu)
+
+
+
+     !------------------------------------------------------
+     !! entropy fix for transonic rarefaction (FIXME!)
+      do 200 i=1,npts
+
+         ! u-c in left state
+         s0 = qr(2,i-1)/qr(1,i-1) - sqrt(g*qr(1,i-1))  !uh/u - sqrt(hu)
          
-      !   ! check for fully supersonic case:
-      !   if (s0 >= 0.d0 .and. s(1,i) > 0.d0)  then
-      !       !all right-going
-      !       do m=1,2
-      !          dt.. = 0.d0 !local time stepping
-      !       enddo
-      !   endif
+        ! check for fully supersonic case:
+        if (s0 >= 0.0 .and. s(1,i) > 0.0)  then
+            !all right-going
+            do m=1,2
+               !amdq,apdq = 0.d0 !left and right going waves
+               amdq(m,i) = 0.d0
+            enddo
+            go to 200
+        endif
+
+        ! u-c to right of 1-wave
+        hr1  = qr(1,i-1) + wave(1,1,i)
+        uhr1 = qr(2,i-1) + wave(2,1,i)
+        s1 =  uhr1/hr1 - dsqrt(g*hr1)
+        if (s0 < 0.d0 .and. s1 > 0.d0) then
+            ! transonic rarefaction in the 1-wave
+            sfract = s0 * (s1-s(1,i)) / (s1-s0)
+
+        else if (s(1,i) < 0.d0) then
+            ! 1-wave is leftgoing
+            sfract = s(1,i)
+        else
+            ! 1-wave is rightgoing
+            sfract = 0.d0   !# this shouldn't happen since s0 < 0
+        endif
+
+        do m=1,2
+            amdq(m,i) = sfract*wave(m,1,i)
+            enddo
 
 
 
-      ! end do
+          
+        ! -------------------------------------------------------
+        ! check 2-wave:
+        ! ---------------
+        ! u+c in right state  (cell i)
+        s3 = ql(2,i)/ql(1,i) + dsqrt(g*ql(1,i))
+                      
+        ! u+c to left of 2-wave
+        hl2  = ql(1,i) - wave(1,2,i)
+        uhl2 = ql(2,i) - wave(2,2,i)
+        s2 = uhl2/hl2 + dsqrt(g*hl2)
+                          
+        if (s2 < 0.d0 .and. s3 > 0.d0) then
+            ! transonic rarefaction in the 2-wave
+            sfract = s2 * (s3-s(2,i)) / (s3-s2)
+        else if (s(2,i) < 0.d0) then
+            ! 2-wave is leftgoing
+            sfract = s(2,i)
+        else
+            ! 2-wave is rightgoing
+            go to 200
+        endif
+    
+        do m=1,2
+            amdq(m,i) = amdq(m,i) + sfract*wave(m,2,i)
+            enddo
+
+    200 enddo
+
+
+    ! compute the rightgoing flux differences:
+    ! df = SUM s*wave   is the total flux difference and apdq = df - amdq
+
+    do m=1,2
+        do i=1,npts
+            df = 0.d0
+            do mw=1,num_waves
+                df = df + s(mw,i)*wave(m,mw,i)
+                enddo
+            apdq(m,i) = df - amdq(m,i)
+         enddo
+    enddo
+
+   !End Riemann entropy correction  (FIXME!)
+   !------------------------------------------------------
+
+    !! apply correction
+    dtdx = dt/dx
+
+    !mx is the number of grid cells in the x-direction,
+    do i = 1, ncells !mx+1
+      ! q(:,i-1) is still in cache from last cycle of i loop, so
+      ! update it first
+      do m = 1, num_eqn
+          Q(m,i-1) = q(m,i-1) - dtdx*amdq(m,i)
+      end do
+      do m = 1, num_eqn
+          Q(m,i) = q(m,i) - dtdx*apdq(m,i)
+      end do
+   end do
+
+   
 
 
 
@@ -520,7 +625,9 @@ PROGRAM solver
   IF (ALLOCATED(qL))           DEALLOCATE(qL)
   IF (ALLOCATED(qR))           DEALLOCATE(qR)
   IF (ALLOCATED(wave))         DEALLOCATE(wave)
-  IF (ALLOCATED(s))         DEALLOCATE(s)
+  IF (ALLOCATED(s))            DEALLOCATE(s)
+  IF (ALLOCATED(amdq))         DEALLOCATE(amdq)
+  IF (ALLOCATED(apdq))         DEALLOCATE(apdq)
 
 END PROGRAM solver
 
