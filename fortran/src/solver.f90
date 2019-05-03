@@ -383,7 +383,6 @@ PROGRAM solver
             enddo
 
 
-
           
         ! -------------------------------------------------------
         ! check 2-wave:
@@ -434,16 +433,20 @@ PROGRAM solver
     dtdx = dt/dx
 
     !mx is the number of grid cells in the x-direction,
-    do i = 1, ncells !mx+1
-      ! q(:,i-1) is still in cache from last cycle of i loop, so
-      ! update it first
-      do m = 1, num_eqn
-          Q(m,i-1) = q(m,i-1) - dtdx*amdq(m,i)
-      end do
-      do m = 1, num_eqn
-          Q(m,i) = q(m,i) - dtdx*apdq(m,i)
-      end do
-   end do
+   !  do i = 2, ncells-1 !mx+1
+   !    ! q(:,i-1) is still in cache from last cycle of i loop, so
+   !    ! update it first
+   !    do m = 1, num_eqn
+   !        Q(m,i) = Q(m,i) + dtdx*amdq(m,i)
+   !    end do
+   !    H(1,i,n)  = Q(1,i)
+   !    uH(1,i,n) = Q(2,i)
+   !    !do m = 1, num_eqn
+   !    !    Q(m,i+1) = Q(m,i+1) - dtdx*apdq(m,i)
+   !    !end do
+      
+   !    !write(*,*)'i= ',i, 'amdq(m,i)=',amdq(m,i), ' apdq(m,i)= ',apdq(m,i)
+   ! end do
 
    
 
@@ -453,10 +456,15 @@ PROGRAM solver
      do i=2,ncells-1
         H(1,i,n+1)  = H(1,i,n) + (dt/dx)*(F(1,i-1)-F(1,i))
         uH(1,i,n+1) = uH(1,i,n) + (dt/dx)*(F(2,i-1)-F(2,i))
-        u(1,i,n+1)  = uH(1,i,n+1)/H(1,i,n+1)
+        
+      !   H(1,i,n+1)  = H(1,i,n) + dtdx*apdq(1,i)
+      !   uH(1,i,n+1) = uH(1,i,n) + dtdx*apdq(2,i)
+      !   !
+         u(1,i,n+1)  = uH(1,i,n+1)/H(1,i,n+1)
 
-        Q(1,i) = H(1,i,n+1)
-        Q(2,i) = uH(1,i,n+1)
+      !   Q(1,i+1) = H(1,i,n+1)
+      !   Q(2,i+1) = uH(1,i,n+1)
+
 
         !write(*,*)'i= ',i,' H= ',H(1,i,n),'uH=',uH(1,i,n),' u= ',u(1,i,n)
      end do !End conservation update
