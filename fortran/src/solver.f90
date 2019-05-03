@@ -20,6 +20,8 @@ PROGRAM solver
   IMPLICIT NONE  
 
   integer, parameter :: WP=defaultp
+  integer, parameter :: num_eqn = 2
+  integer, parameter :: num_waves = 2
   real(wp), parameter :: e=2.718281828459045
   real(wp), parameter :: atol = 0.00000000000000001    ! a new tolerance
   INTEGER, DIMENSION(3), PARAMETER :: it1 = (/ 40, 80, 120 /)   ! output times
@@ -29,8 +31,8 @@ PROGRAM solver
   INTEGER :: j       ! dummy index in space
   INTEGER :: n       ! dummy index in time
   INTEGER :: ex_n    ! seperate time index for exact sol.
-  INTEGER :: npts    ! # of points
-  INTEGER :: ncells  ! # of cells
+  INTEGER :: npts    ! # of points 64001 interfaces (1D boundary is a point ghost nodes need to outer boundary)
+  INTEGER :: ncells  ! # of cells 64002 centers (cell -> cell center)
   INTEGER :: nt      ! # of timesteps
   INTEGER :: t_1sec  ! index at approx 1 sec
   INTEGER :: waveI   ! index location of the max Left Eigenvalue
@@ -47,21 +49,25 @@ PROGRAM solver
   LOGICAL :: flexists     ! a logical variable. I .true. or .false.
   LOGICAL :: godunov      ! true for theta == integer 1 else theta is real
 
-  REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: pts          ! 1 x npts array of points
+  REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: pts          ! 1 x npts array of points (cell boundaries)
   REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: cells        ! 1 x ncells = npts+1  array of cells
 
   REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: lamda        ! 2 x ncells = vector of eigenvalues
   REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: F            ! 2 x ncells = Flux vector for each cell
   REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: Q            ! 2 x ncells = storage vector for current H,uH
+  REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: qL,qR        ! left and right q(i) on the ith cell
+                                                          ! these agree with Q(i), the cell average.
   REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: alpha        ! 1 x ncells = npts+1  array of cells
+  REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: wave         ! Riemann problem waves (num_eqn, num_wave, ncells)
 
-  REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: H            ! 1 x ncells array cell
-  REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: u            ! 1 x ncells array cell 
+  REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: H            ! 1 x ncells array cell - height
+  REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: uH           ! 1 x ncells array cell - momentum
+  REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: u            ! 1 x ncells array cell - speed
   REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: H_hat        ! 1 x npts face centered
   REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: u_hat        ! 1 x npts face centered
-
-  REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: uH           ! 1 x ncells array cell 
   REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: H_exact      ! 1 x ncells array cell 
+
+  REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: s            ! entropy fix
 
 
 
@@ -72,6 +78,7 @@ PROGRAM solver
   REAL(WP), ALLOCATABLE, DIMENSION(:)     :: cm           ! super - diagonal
   REAL(WP), ALLOCATABLE, DIMENSION(:)     :: dm           ! implicit RHS
 
+  REAL(WP), DIMENSION(2)                  :: lambda_m     ! entropy fix
 
   
   real(wp) :: g        ! gravitational acceleration
@@ -97,12 +104,15 @@ PROGRAM solver
 
 
   real(wp) :: dummy1   ! dummy vbl
-  real(wp) :: dummy2   ! dummy vbl
-  real(wp) :: dummy3   ! dummy vbl
+  !real(wp) :: dummy2   ! dummy vbl
+  !sreal(wp) :: dummy3   ! dummy vbl
   real(wp) :: dummy4   ! dummy vbl
   real(wp) :: dummy5   ! dummy vbl
   real(wp) :: dummy6   ! dummy vbl  
 
+  real(wp) :: delta(2) !
+
+  real(wp) :: cbar     ! sqrt(gh)
 
 !!$  real(wp) :: rho_c    ! density times specific heat
 !!$  real(wp) :: a        ! part of Robin's B.C.
@@ -124,8 +134,8 @@ PROGRAM solver
   real(wp) :: start
   real(wp) :: finish
 
-  real(wp) :: se1   ! roe speed e1  
-  real(wp) :: se2   ! roe speed e2
+  !entropy fix
+  real(wp) :: s0 ! entropy
 
 
 
@@ -156,7 +166,7 @@ PROGRAM solver
      WRITE(6,'(AA)') ' input file,  ', inputfile
      WRITE(6,*) 'output file, ', outputfile  
      !WRITE(6,*) 'scheme type, ', scheme_type
-     WRITE(6,'(A)') 'ENME 6728 Unsteady Diffusion Scheme'
+     WRITE(6,'(A)') 'ENME 6728 Unsteady Shallow Water Scheme'
      Write(6,*)     ' 8-25-2012 Implementation By Luke McCulloch'
      write(6,*) ''
      Write(6,*)     ' Soving the Shallow Water Equations in 1D'
@@ -165,7 +175,7 @@ PROGRAM solver
                          L, xo, npts, pts, ncells, cells, &
                          nt, H, u, uH, HL, HRoHL, H_hat, u_hat,C)
 
-
+     
      write(*,*)'HL=',HL
      write(*,*)'HR/HL=',HRoHL
      ! Parse the Scheme Type
@@ -186,7 +196,7 @@ PROGRAM solver
   write(6,'(A4,D16.8)') '  dx =', dx
   write(*,*) ''
   write(*,*) '  Face Locations:'
-  write(*,'(1D16.8)') pts
+  !write(*,'(1D16.8)') pts
 
 
 
@@ -215,7 +225,12 @@ PROGRAM solver
   ALLOCATE( h(1,ncells,nt+1))
   ALLOCATE( uH(1,ncells,nt+1))
   ALLOCATE( u(1,ncells,nt+1))
-  !pause
+  ALLOCATE( Q(num_eqn,ncells) )
+  allocate( qL(num_eqn,ncells))
+  allocate( qR(num_eqn,ncells))
+  allocate( wave(num_eqn, num_waves, ncells ) )
+  allocate( s(num_waves, ncells ) )
+
 !!$
 !!$  If (implicit .eqv. .true.) then
 !!$     write(*,*) 'Implicit scheme, time step is independent of mesh size'
@@ -225,19 +240,19 @@ PROGRAM solver
 
 
   write(*,*) ''
-  call InitialConditions1D(npts, ncells, pts, cells,  HL, HRoHL, H, u, uH)
+  call InitialConditions1D(npts, ncells, pts, cells,  HL, HRoHL, H, u, uH, Q, qL, qR)
   !write(*,*) '  Initial H:'
   !do i=1,ncells
   !   write(*,*)'cell loc=',cells(1,i),'initial H=', H(1,i,1),'initial U = ',u(1,i,1),'initial uH=',uH(1,i,1)
   !end do
   !write(*,'(A4,D16.4)') '  k= ',k
   !stop
-  ALLOCATE( lamda(2,npts) )
-  ALLOCATE( F(2,npts) )
-  ALLOCATE( Q(2,npts) )
-  ALLOCATE( alpha(2,npts) )
+  ALLOCATE( lamda(num_eqn,npts) )
+  ALLOCATE( F(num_eqn,npts) )
+  ALLOCATE( alpha(num_eqn,npts) )
 
-
+  print*, 'npts   = ', npts
+  print*, 'ncells = ', ncells
 
 
   g=9.81 !! gravitational acceleration, m/s/s
@@ -258,6 +273,9 @@ PROGRAM solver
 
      !! #Cell face "pts" loop to update Roe avg vbls at the faces
      dummy5=1.
+
+     !------------------------------------------------------
+     ! Main loop of the Riemann solver.
      do i=1,npts
         ! hbar, LaVeque 15.32 
         H_hat(1,i)=(H(1,i+1,n)+H(1,i,n))/2.
@@ -265,6 +283,8 @@ PROGRAM solver
         ! Roe Average Velocity, LaVeque 15.35
         u_hat(1,i)=( u(1,i+1,n)*sqrt(H(1,i+1,n)) + u(1,i,n)*sqrt(H(1,i,n)) )/&
              (sqrt(H(1,i+1,n))+sqrt(H(1,i,n)))
+        !mixing conventions.... sorry!
+        cbar = sqrt(0.5d0*g*(qr(1,i-1) + ql(1,i)))  !  0.5 * g * (u(1,i) + u(1,i-1)) where u(1) is h
 
         !! eigen values, LaVeque 15.36
         lamda(1,i) = u_hat(1,i)-sqrt(g*H_hat(1,i))
@@ -280,25 +300,49 @@ PROGRAM solver
 
 
         dummy1 = 1.0/( lamda(2,i) - lamda(1,i) )
-        dummy2 = H(1,i+1,n)-H(1,i,n)
-        dummy3 = uH(1,i+1,n) - uH(1,i,n)
+        delta(1) = H(1,i+1,n)-H(1,i,n) !delta1
+        delta(2) = uH(1,i+1,n) - uH(1,i,n) !delta2
         dummy4 = u(1,i,n)*uH(1,i,n) + g*((H(1,i,n))**2)/2.
 
-        !! alpha coefficients, LaVeque 15.39?
-        alpha(1,i) = dummy1* (  lamda(2,i)*dummy2 - dummy3 )
-        alpha(2,i) = dummy1* ( -lamda(1,i)*dummy2 + dummy3 )
+        !! alpha coefficients, LaVeque 15.39. eignevector expansion of delta(1) delta(2)
+        alpha(1,i) = dummy1* (  lamda(2,i)*delta(1) - delta(2) )
+        alpha(2,i) = dummy1* ( -lamda(1,i)*delta(1) + delta(2) )
 
 
 
+        ! Finally, compute the waves.
+        wave(1,1,i) = alpha(1,i)
+        wave(2,1,i) = alpha(1,i)*(u_hat(1,i) - cbar)
+        s(1,i) = u_hat(1,i) - cbar
+        ! needed for HR schemes and for entropy fix
 
         !! Define the flux at each interface
         F(1,i) = uH(1,i,n) + min(lamda(1,i),0.)*alpha(1,i) + min(lamda(2,i),0.)*alpha(2,i)
         F(2,i) = dummy4 + min(lamda(1,i),0.)*alpha(1,i)*lamda(1,i) + min(lamda(2,i),0.)*alpha(2,i)*lamda(2,i)
 
-      !! todo: fix the entropy for transonic rarefaction
+
+
 
      end do !End Riemann flux update
-     !pause
+     !------------------------------------------------------
+     !! entropy fix for transonic rarefaction
+      ! do i=1,npts
+      !    ! L wave
+      !    s0 = qr(2,i-1)/qr(1,i-1) - dsqrt(g*qr(1,i-1))  !uh/u - sqrt(hu)
+         
+      !   ! check for fully supersonic case:
+      !   if (s0 >= 0.d0 .and. s(1,i) > 0.d0)  then
+      !       !all right-going
+      !       do m=1,2
+      !          dt.. = 0.d0 !local time stepping
+      !       enddo
+      !   endif
+
+
+
+      ! end do
+
+
 
      !! #Update cell centered values H, uH, and u
      do i=2,ncells-1
@@ -306,6 +350,8 @@ PROGRAM solver
         uH(1,i,n+1) = uH(1,i,n) + (dt/dx)*(F(2,i-1)-F(2,i))
         u(1,i,n+1)  = uH(1,i,n+1)/H(1,i,n+1)
 
+        Q(1,i) = H(1,i,n+1)
+        Q(2,i) = uH(1,i,n+1)
 
         !write(*,*)'i= ',i,' H= ',H(1,i,n),'uH=',uH(1,i,n),' u= ',u(1,i,n)
      end do !End conservation update
@@ -375,7 +421,7 @@ PROGRAM solver
      end if
      
      !write(*,*)'i= ',i,'lamda1= ',lamda(1,i),'lamda2= ',lamda(2,i),'','Flux1=',F(1,i),'Flux2=',F(2,i)
-     write(*,*)'i= ',i,'uhat= ',H_hat(1,i),'Hhat= ',H_hat(1,i)
+     !write(*,*)'i= ',i,'uhat= ',H_hat(1,i),'Hhat= ',H_hat(1,i)
   end do
   call cpu_time(finish)
 !!========================================================================================
@@ -471,6 +517,10 @@ PROGRAM solver
   IF (ALLOCATED(cm))           DEALLOCATE(cm)
   IF (ALLOCATED(dm))           DEALLOCATE(dm)
 
+  IF (ALLOCATED(qL))           DEALLOCATE(qL)
+  IF (ALLOCATED(qR))           DEALLOCATE(qR)
+  IF (ALLOCATED(wave))         DEALLOCATE(wave)
+  IF (ALLOCATED(s))         DEALLOCATE(s)
 
 END PROGRAM solver
 

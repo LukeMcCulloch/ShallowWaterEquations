@@ -12,7 +12,7 @@ Module initial_conditions
 
 Contains
 
-  Subroutine InitialConditions1D(npts, ncells, pts, cells,  HL, HRoHL, H, u, uH)
+  Subroutine InitialConditions1D(npts, ncells, pts, cells,  HL, HRoHL, H, u, uH, Q, qL, qR)
     ! Subroutine to Compute Points on a line
     
     INTEGER :: npts, ncells, i, n
@@ -22,6 +22,9 @@ Contains
     REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: H      ! 1 x npts x nt array cell H 
     REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: u      ! 1 x npts x nt array cell u velocities
     REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: uH     ! 1 x npts x nt array cell uH 
+    REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: Q  
+    REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: qL
+    REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: qR
     real(wp) :: HL, HR, HRoHL, tol
 
 
@@ -30,7 +33,6 @@ Contains
     HR = HL*HRoHL
     Write (*,*) '============================================================================'
     write(*,*)'                     Establishing initial conditions:'
-    write(*,*)'ncells = ',ncells
    
 
     Do i = 1,ncells
@@ -42,7 +44,15 @@ Contains
        end if
        uH(1,i,1) = u(1,i,1)*H(1,i,1)
 
+       
+       Q(1,i) = H(1,i,1) 
+       Q(2,i) = uH(1,i,1)
+
     End Do
+    
+    qL = Q
+    qR = Q
+
 
    !  do i=1,ncells
    !     write(*,*)'i=',i,' H = ',H(1,i,1)
@@ -55,7 +65,7 @@ Contains
    !  do i=1,ncells
    !     write(*,*)'i=',i,' u = ',u(1,i,1)
    !  end do
-    print*
+   ! print*
    
 
     

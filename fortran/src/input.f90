@@ -85,7 +85,7 @@ CONTAINS
      !write(20,*) title
      !WRITE(20, FMT='(AI8)') 'ncells = ', ncells
      !WRITE(20, FMT='(AI8)') 'HR/HL =  ', HRoHL
-     WRITE(20, FMT='(f19.10)') HRoHL
+     !WRITE(20, FMT='(f19.10)') HRoHL
      !write(20,*) '--------------------------------------------------------'
      
      write(*,*) 'Ending Subroutine input'

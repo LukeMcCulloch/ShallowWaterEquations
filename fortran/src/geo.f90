@@ -41,8 +41,8 @@ CONTAINS
     Do i = 2,ncells
        cells(1,i)=cells(1,i-1)+dx
     End Do
-    write(*,*) 'cells'
-    write(*,'(1D16.8)') cells
+    !write(*,*) 'cells'
+    !write(*,'(1D16.8)') cells
 
   End Subroutine line
 
