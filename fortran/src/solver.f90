@@ -149,7 +149,9 @@ PROGRAM solver
   real(wp) :: uhl2 ! entropy
   real(wp) :: sfract ! entropy
 
-  real(wp) :: df ! entropy
+  real(wp) :: df      ! entropy
+  real(wp) :: dtdxave ! entropy
+  
 
 
 
@@ -233,7 +235,8 @@ PROGRAM solver
   !write(*,*) 'Please input your choice of output time as a real number, in seconds :>'
   !read(*,*)  tout
   tout = 1.
-  nt=1!int(tout/dt)+1
+  !nt = !int(tout/dt)+1 
+  nt=1!do time stepping in place.
   write(*,*)'nt*dt=',nt*dt,'nt=', nt
   
   ALLOCATE( h(1,ncells,nt+1))
@@ -287,6 +290,7 @@ PROGRAM solver
   n=1
   do while (time<tout)
 !  do n=1,nt
+   !write(*,*) time
 
      !! #Cell face "pts" loop to update Roe avg vbls at the faces
      dummy5=1.
@@ -331,11 +335,15 @@ PROGRAM solver
         wave(1,1,i) = alpha(1,i)
         wave(2,1,i) = alpha(1,i)*(u_hat(1,i) - cbar)
         s(1,i) = u_hat(1,i) - cbar
+        
+        wave(1,2,i) = alpha(2,i)
+        wave(2,2,i) = alpha(2,i)*(u_hat(1,i) + cbar)
+        s(2,i) = u_hat(1,i) + cbar
         ! needed for HR schemes and for entropy fix
 
         !! Define the flux at each interface
-        F(1,i) = uH(1,i,n) + min(lamda(1,i),0.)*alpha(1,i) + min(lamda(2,i),0.)*alpha(2,i)
-        F(2,i) = dummy4 + min(lamda(1,i),0.)*alpha(1,i)*lamda(1,i) + min(lamda(2,i),0.)*alpha(2,i)*lamda(2,i)
+        !F(1,i) = uH(1,i,n) + min(lamda(1,i),0.)*alpha(1,i) + min(lamda(2,i),0.)*alpha(2,i)
+        !F(2,i) = dummy4 + min(lamda(1,i),0.)*alpha(1,i)*lamda(1,i) + min(lamda(2,i),0.)*alpha(2,i)*lamda(2,i)
 
 
 
@@ -348,10 +356,11 @@ PROGRAM solver
      !------------------------------------------------------
      !! entropy fix for transonic rarefaction (FIXME!)
       do 200 i=1,npts
+      !do 200 i = 2, ncells-1 
 
          ! u-c in left state
          s0 = qr(2,i-1)/qr(1,i-1) - sqrt(g*qr(1,i-1))  !uh/u - sqrt(hu)
-         
+
         ! check for fully supersonic case:
         if (s0 >= 0.0 .and. s(1,i) > 0.0)  then
             !all right-going
@@ -368,18 +377,27 @@ PROGRAM solver
         s1 =  uhr1/hr1 - dsqrt(g*hr1)
         if (s0 < 0.d0 .and. s1 > 0.d0) then
             ! transonic rarefaction in the 1-wave
+            !write(*,*) 'found transonic rarefaction in the 1 wave'
             sfract = s0 * (s1-s(1,i)) / (s1-s0)
+            !write(*,*) 's0 ',s0,'s1 ',s1,'s(1,i) ',s(1,i)
+            !write(*,*) 'sfract ',sfract
+            !write(*,*) 'time = ', time
 
         else if (s(1,i) < 0.d0) then
             ! 1-wave is leftgoing
+            !write(*,*) '1 wave is leftgoing'
             sfract = s(1,i)
         else
             ! 1-wave is rightgoing
+            !write(*,*) '1 wave is rightgoing'
             sfract = 0.d0   !# this shouldn't happen since s0 < 0
         endif
 
         do m=1,2
             amdq(m,i) = sfract*wave(m,1,i)
+            !if (s0 < 0.d0 .and. s1 > 0.d0) then
+            !   write(*,*) 'amdq(m,i) = ',amdq(m,i)
+            !endif
             enddo
 
 
@@ -397,17 +415,23 @@ PROGRAM solver
                           
         if (s2 < 0.d0 .and. s3 > 0.d0) then
             ! transonic rarefaction in the 2-wave
+            !write(*,*) 'found transonic rarefaction in the 2 wave'
             sfract = s2 * (s3-s(2,i)) / (s3-s2)
         else if (s(2,i) < 0.d0) then
             ! 2-wave is leftgoing
+            !write(*,*) '2 wave is leftgoing'
             sfract = s(2,i)
         else
             ! 2-wave is rightgoing
+            !write(*,*) '2 wave is rightgoing'
             go to 200
         endif
     
         do m=1,2
             amdq(m,i) = amdq(m,i) + sfract*wave(m,2,i)
+            !if (s2 < 0.d0 .and. s3 > 0.d0) then
+            !   write(*,*) 'amdq(m,i) = ',amdq(m,i)
+            !endif
             enddo
 
     200 enddo
@@ -418,6 +442,7 @@ PROGRAM solver
 
     do m=1,2
         do i=1,npts
+        !do i = 2, ncells-1 
             df = 0.d0
             do mw=1,num_waves
                 df = df + s(mw,i)*wave(m,mw,i)
@@ -426,48 +451,83 @@ PROGRAM solver
          enddo
     enddo
 
-   !End Riemann entropy correction  (FIXME!)
-   !------------------------------------------------------
+   !End Riemann entropy correction  
+!  ============================================
 
     !! apply correction
     dtdx = dt/dx
 
-    !mx is the number of grid cells in the x-direction,
-   !  do i = 2, ncells-1 !mx+1
-   !    ! q(:,i-1) is still in cache from last cycle of i loop, so
-   !    ! update it first
-   !    do m = 1, num_eqn
-   !        Q(m,i) = Q(m,i) + dtdx*amdq(m,i)
-   !    end do
-   !    H(1,i,n)  = Q(1,i)
-   !    uH(1,i,n) = Q(2,i)
-   !    !do m = 1, num_eqn
-   !    !    Q(m,i+1) = Q(m,i+1) - dtdx*apdq(m,i)
-   !    !end do
+    do i = 2, ncells-1 
+      do m = 1, num_eqn ! left boundary
+          Q(m,i) = Q(m,i) - dtdx*amdq(m,i)
+      end do 
+      do m = 1, num_eqn ! right boundary
+         Q(m,i+1) = Q(m,i+1) - dtdx*apdq(m,i)
+      end do
       
-   !    !write(*,*)'i= ',i, 'amdq(m,i)=',amdq(m,i), ' apdq(m,i)= ',apdq(m,i)
-   ! end do
+      !write(*,*)'i= ',i, 'amdq(m,i)=',amdq(m,i), ' apdq(m,i)= ',apdq(m,i)
+   end do
 
+!     # compute maximum wave speed:
+   do i = 2, ncells-1 
+       do mw=1,num_waves
+       !          # if s>0 use dtdx(i) to compute CFL,
+       !          # if s<0 use dtdx(i-1) to compute CFL:
+           C = dmax1(C, dtdx*s(mw,i), -dtdx*s(mw,i))
+       end do
+   end do
+
+
+
+   !! call second order limiter:
+!  ============================================
+   !! call limiter(*)
+
+
+!  apply the entropy correction  
+!  ============================================
+   !do i=1,mx+1
+   !do i=1,npts
+   do i = 2, ncells-1 
+      do m = 1,num_eqn
+          f(m,i-1) = 0.d0
+      end do
+      dtdxave = dtdx ! 0.5d0 * ( dtdx(left) + dtdx(right) )
+      do mw=1,num_waves
+          do m=1,num_eqn
+              f(m,i-1) = f(m,i-1) + 0.5d0 * dabs(s(mw,i)) &
+              * (1.d0 - dabs(s(mw,i))*dtdxave) * wave(m,mw,i)
+          end do
+      end do
+  end do
+
+
+!  # update q by differencing correction fluxes
+!  ============================================
+   do i = 2, ncells-1 
+      do m = 1, num_eqn
+         Q(m,i) = Q(m,i) - dtdx * (F(m,i) - F(m,i-1))
+      end do
+      H(1,i,n+1)  = Q(1,i)
+      uH(1,i,n+1) = Q(2,i)
+      u(1,i,n+1)  = uH(1,i,n+1)/H(1,i,n+1)
+   end do
    
 
 
 
      !! #Update cell centered values H, uH, and u
-     do i=2,ncells-1
-        H(1,i,n+1)  = H(1,i,n) + (dt/dx)*(F(1,i-1)-F(1,i))
-        uH(1,i,n+1) = uH(1,i,n) + (dt/dx)*(F(2,i-1)-F(2,i))
-        
-      !   H(1,i,n+1)  = H(1,i,n) + dtdx*apdq(1,i)
-      !   uH(1,i,n+1) = uH(1,i,n) + dtdx*apdq(2,i)
-      !   !
-         u(1,i,n+1)  = uH(1,i,n+1)/H(1,i,n+1)
+   !   do i=2,ncells-1
+   !      H(1,i,n+1)  = H(1,i,n) + (dt/dx)*(F(1,i-1)-F(1,i))
+   !      uH(1,i,n+1) = uH(1,i,n) + (dt/dx)*(F(2,i-1)-F(2,i))
+   !      u(1,i,n+1)  = uH(1,i,n+1)/H(1,i,n+1)
 
-      !   Q(1,i+1) = H(1,i,n+1)
-      !   Q(2,i+1) = uH(1,i,n+1)
+   !    !  Q(1,i+1) = H(1,i,n+1)
+   !    !  Q(2,i+1) = uH(1,i,n+1)
 
 
-        !write(*,*)'i= ',i,' H= ',H(1,i,n),'uH=',uH(1,i,n),' u= ',u(1,i,n)
-     end do !End conservation update
+   !      !write(*,*)'i= ',i,' H= ',H(1,i,n),'uH=',uH(1,i,n),' u= ',u(1,i,n)
+   !   end do !End conservation update
 
      !Update the LHS ghost cell:
      H(1,1,n+1)  = H(1,2,n+1)
