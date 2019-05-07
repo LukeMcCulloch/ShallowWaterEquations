@@ -22,7 +22,7 @@ Contains
     REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: H      ! 1 x npts x nt array cell H 
     REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: u      ! 1 x npts x nt array cell u velocities
     REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: uH     ! 1 x npts x nt array cell uH 
-    REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: Q  
+    REAL(WP), ALLOCATABLE, DIMENSION(:,:,:) :: Q  
     REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: qL
     REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: qR
     real(wp) :: HL, HR, HRoHL, tol
@@ -45,13 +45,14 @@ Contains
        uH(1,i,1) = u(1,i,1)*H(1,i,1)
 
        
-       Q(1,i) = H(1,i,1) 
-       Q(2,i) = uH(1,i,1)
+       Q(1,i,1) = H(1,i,1) 
+       Q(2,i,1) = uH(1,i,1)
 
     End Do
     
-    qL = Q
-    qR = Q
+    ! qL == qR for simple solvers
+    qL = Q(:,:,1)
+    qR = Q(:,:,1)
 
 
    !  do i=1,ncells
