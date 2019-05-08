@@ -305,7 +305,7 @@ PROGRAM solver
         u_hat(1,i)=( u(1,i+1,n)*sqrt(H(1,i+1,n)) + u(1,i,n)*sqrt(H(1,i,n)) )/&
              (sqrt(H(1,i+1,n))+sqrt(H(1,i,n)))
         !mixing conventions.... sorry!
-        cbar = sqrt(0.5d0*g*(qr(1,i-1) + ql(1,i)))  !  0.5 * g * (u(1,i) + u(1,i-1)) where u(1) is h
+        cbar = sqrt(0.5d0*g*(qr(1,i+1) + ql(1,i)))  !  0.5 * g * (u(1,i) + u(1,i-1)) where u(1) is h
 
         !! eigen values, LaVeque 15.36
         lamda(1,i) = u_hat(1,i)-sqrt(g*H_hat(1,i))
@@ -326,11 +326,11 @@ PROGRAM solver
         dummy4 = u(1,i,n)*uH(1,i,n) + g*((H(1,i,n))**2)/2.
 
         !! alpha coefficients, LaVeque 15.39. eignevector expansion of delta(1) delta(2)
-        alpha(1,i) = dummy1* (  lamda(2,i)*delta(1) - delta(2) )
-        alpha(2,i) = dummy1* ( -lamda(1,i)*delta(1) + delta(2) )
+        !alpha(1,i) = dummy1* (  lamda(2,i)*delta(1) - delta(2) )
+        !alpha(2,i) = dummy1* ( -lamda(1,i)*delta(1) + delta(2) )
 !
-        !alpha(1,i) = 0.5d0*(-delta(2) + (u_hat(1,i) + cbar) * delta(1))/cbar
-        !alpha(2,i) = 0.5d0*( delta(2) - (u_hat(1,i) - cbar) * delta(1))/cbar
+        alpha(1,i) = 0.5d0*(-delta(2) + (u_hat(1,i) + cbar) * delta(1))/cbar
+        alpha(2,i) = 0.5d0*( delta(2) - (u_hat(1,i) - cbar) * delta(1))/cbar
 
 
 
@@ -345,8 +345,8 @@ PROGRAM solver
         ! needed for HR schemes and for entropy fix
 
         !! Define the flux at each interface
-        F(1,i) = uH(1,i,n) + min(lamda(1,i),0.)*alpha(1,i) + min(lamda(2,i),0.)*alpha(2,i)
-        F(2,i) = dummy4 + min(lamda(1,i),0.)*alpha(1,i)*lamda(1,i) + min(lamda(2,i),0.)*alpha(2,i)*lamda(2,i)
+        !F(1,i) = uH(1,i,n) + min(lamda(1,i),0.)*alpha(1,i) + min(lamda(2,i),0.)*alpha(2,i)
+        !F(2,i) = dummy4 + min(lamda(1,i),0.)*alpha(1,i)*lamda(1,i) + min(lamda(2,i),0.)*alpha(2,i)*lamda(2,i)
 
 
 
@@ -460,23 +460,23 @@ PROGRAM solver
 !     !! apply correction
      dtdx = dt/dx
 
-   !  do i = 1, ncells-1
-   !  !do i = 2, ncells
-   !    ! do m = 1, num_eqn ! left boundary
-   !    !     Q(m,i-1,n) = Q(m,i-1,n) - dtdx*amdq(m,i)
-   !    ! end do 
-   !    ! do m = 1, num_eqn ! right boundary
-   !    !    Q(m,i,n) = Q(m,i,n) - dtdx*apdq(m,i)
-   !    ! end do
-   !    do m = 1, num_eqn ! left boundary
-   !        Q(m,i,n) = Q(m,i,n) - dtdx*amdq(m,i)
-   !    end do 
-   !    do m = 1, num_eqn ! right boundary
-   !       Q(m,i+1,n) = Q(m,i+1,n) - dtdx*apdq(m,i)
-   !    end do
+    do i = 1, ncells-1
+    !do i = 2, ncells
+      ! do m = 1, num_eqn ! left boundary
+      !     Q(m,i-1,n) = Q(m,i-1,n) - dtdx*amdq(m,i)
+      ! end do 
+      ! do m = 1, num_eqn ! right boundary
+      !    Q(m,i,n) = Q(m,i,n) - dtdx*apdq(m,i)
+      ! end do
+      do m = 1, num_eqn ! left boundary
+          Q(m,i,n) = Q(m,i,n) - dtdx*amdq(m,i)
+      end do 
+      do m = 1, num_eqn ! right boundary
+         Q(m,i+1,n) = Q(m,i+1,n) - dtdx*apdq(m,i)
+      end do
       
-   !    !write(*,*)'i= ',i, 'amdq(m,i)=',amdq(m,i), ' apdq(m,i)= ',apdq(m,i)
-   ! end do
+      !write(*,*)'i= ',i, 'amdq(m,i)=',amdq(m,i), ' apdq(m,i)= ',apdq(m,i)
+   end do
 
 !     # compute maximum wave speed:
    ! C = 0.d0
@@ -497,20 +497,20 @@ PROGRAM solver
 !  apply the f
 !  ============================================
    !do i=1,mx+1
-!    do i=1,npts
-!    !do i = 2, ncells-1 
-!    !do i = 1, ncells
-!       do m = 1,num_eqn
-!           f(m,i) = 0.d0
-!       end do
-!       dtdxave = dtdx ! 0.5d0 * ( dtdx(left) + dtdx(right) )
-!       do mw=1,num_waves
-!           do m=1,num_eqn
-!               f(m,i) = f(m,i) + 0.5d0 * dabs(s(mw,i)) &
-!               * (1.d0 - dabs(s(mw,i))*dtdxave) * wave(m,mw,i)
-!           end do
-!       end do
-!   end do
+   do i=1,npts
+   !do i = 2, ncells-1 
+   !do i = 1, ncells
+      do m = 1,num_eqn
+          f(m,i) = 0.d0
+      end do
+      dtdxave = dtdx ! 0.5d0 * ( dtdx(left) + dtdx(right) )
+      do mw=1,num_waves
+          do m=1,num_eqn
+              f(m,i) = f(m,i) + 0.5d0 * dabs(s(mw,i)) &
+              * (1.d0 - dabs(s(mw,i))*dtdxave) * wave(m,mw,i)
+          end do
+      end do
+  end do
 
 
 !  # Update cell centered values H, uH, and u
@@ -555,6 +555,7 @@ PROGRAM solver
      uH(1,ncells,n+1) = u(1,ncells,n)*H(1,ncells,n)
      Q(1,ncells, n+1) = H(1,ncells-1,n+1)
      Q(2,ncells, n+1) = u(1,ncells,n)*H(1,ncells,n)
+
      
      ! This is the time at which the updated values exist
      !time = time+dt
@@ -595,6 +596,9 @@ PROGRAM solver
 
         Q(1,i,n) = Q(1,i,n+1)
         Q(2,i,n) = Q(2,i,n+1) 
+
+        qL(:,i) = Q(:,i,n+1)
+        qR(:,i) = Q(:,i,n+1)
          
         !write(*,*)'i= ',i,' H= ',H(1,i,n),'uH=',uH(1,i,n),' u= ',u(1,i,n)
      end do !End conservation update
