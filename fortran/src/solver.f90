@@ -494,8 +494,7 @@ PROGRAM solver
 
    !! call second order limiter:
 !  ============================================
-   call limiter(ncells,num_eqn,num_waves,1,ncells, &
-    wave,s,mthlim)
+   call limiter(ncells,num_eqn,num_waves,1,ncells, wave,s,mthlim)
 
 !  apply the f
 !  ============================================
@@ -723,6 +722,8 @@ PROGRAM solver
   IF (ALLOCATED(s))            DEALLOCATE(s)
   IF (ALLOCATED(amdq))         DEALLOCATE(amdq)
   IF (ALLOCATED(apdq))         DEALLOCATE(apdq)
+
+  if (allocated(mthlim))       deallocate(mthlim)
 
 END PROGRAM solver
 

@@ -45,7 +45,7 @@ subroutine limiter(maxm,num_eqn,num_waves,num_ghost,mx,wave,s,mthlim)
 
     dotr = 0.d0
 
-    x_loop: do i = 0, mx+1
+    x_loop: do i = 0, mx!+1
 
         wave_loop: do mw=1,num_waves
             if (mthlim(mw) == 0) then
