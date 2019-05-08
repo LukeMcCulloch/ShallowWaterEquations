@@ -20,6 +20,7 @@ SOURCES = precise.f90 \
 	initial_conditions.f90 \
 	geo.f90 \
 	inv.f90 \
+	limiter.f90\
 	solver.f90
 
 

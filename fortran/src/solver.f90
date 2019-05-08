@@ -49,6 +49,8 @@ PROGRAM solver
   LOGICAL :: flexists     ! a logical variable. I .true. or .false.
   LOGICAL :: godunov      ! true for theta == integer 1 else theta is real
 
+  integer, ALLOCATABLE, DIMENSION(:)      :: mthlim       ! LaVeque limiter selector
+
   REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: pts          ! 1 x npts array of points (cell boundaries)
   REAL(WP), ALLOCATABLE, DIMENSION(:,:)   :: cells        ! 1 x ncells = npts+1  array of cells
 
@@ -79,9 +81,6 @@ PROGRAM solver
   REAL(WP), ALLOCATABLE, DIMENSION(:)     :: bm           ! main  - diagonal
   REAL(WP), ALLOCATABLE, DIMENSION(:)     :: cm           ! super - diagonal
   REAL(WP), ALLOCATABLE, DIMENSION(:)     :: dm           ! implicit RHS
-
-  !REAL(WP), DIMENSION(2)                  :: lambda_m     ! entropy fix
-
   
   real(wp) :: g        ! gravitational acceleration
   real(wp) :: L        ! length
@@ -249,13 +248,16 @@ PROGRAM solver
   allocate( s(num_waves, ncells ) )
   allocate( amdq(num_eqn, ncells ) )
   allocate( apdq(num_eqn, ncells ) )
+  allocate( mthlim(num_waves) )
 
-!!$
-!!$  If (implicit .eqv. .true.) then
-!!$     write(*,*) 'Implicit scheme, time step is independent of mesh size'
-!!$     write(*,*) 'Please input your choice of time step as a real number:>'
-!!$     read(*,*)  dt
-!!$  end if
+!! limiter settings
+! mthlim(mw) = 0 for no limiter
+!             = 1 for minmod
+!             = 2 for superbee
+!             = 3 for van Leer
+!             = 4 for monotonized centered
+  mthlim(1) = 1
+  mthlim(2) = 1
 
 
   write(*,*) ''
@@ -479,20 +481,21 @@ PROGRAM solver
    end do
 
 !     # compute maximum wave speed:
-   ! C = 0.d0
-   ! do i = 2, ncells-1 
-   !     do mw=1,num_waves
-   !     !          # if s>0 use dtdx(i) to compute CFL,
-   !     !          # if s<0 use dtdx(i-1) to compute CFL:
-   !         C = dmax1(C, dtdx*s(mw,i), -dtdx*s(mw,i))
-   !     end do
-   ! end do
+   C = 0.d0
+   do i = 2, ncells-1 
+       do mw=1,num_waves
+       !          # if s>0 use dtdx(i) to compute CFL,
+       !          # if s<0 use dtdx(i-1) to compute CFL:
+           C = dmax1(C, dtdx*s(mw,i), -dtdx*s(mw,i))
+       end do
+   end do
 
 
 
    !! call second order limiter:
 !  ============================================
-   !! call limiter(*)
+   call limiter(ncells,num_eqn,num_waves,1,ncells, &
+    wave,s,mthlim)
 
 !  apply the f
 !  ============================================
