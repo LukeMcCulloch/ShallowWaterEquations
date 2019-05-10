@@ -1,3 +1,3 @@
 # ShallowWaterEquations
 Roe approximate Riemann solver for the shallow water equations.  
-Now with entropy fix for transonic rarefaction.
+Includes LaVeque's entropy fix for transonic rarefaction.
